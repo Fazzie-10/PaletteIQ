@@ -47,6 +47,9 @@ type ColorblindMode = 'none' | 'protanopia' | 'deuteranopia' | 'tritanopia' | 'a
 
 // --- Constants ---
 
+// FIX 1: Updated model string — gemini-3-flash-preview was shut down March 9, 2026
+const GEMINI_MODEL = "gemini-3.1-pro-preview";
+
 const GEMINI_PROMPT = `Analyze this data visualization. Extract 4–10 dominant colors. Return ONLY a JSON object:
 {
 "palette": [{ 
@@ -88,6 +91,7 @@ const Navbar = () => (
   </nav>
 );
 
+// FIX 5: Updated copyright year from 2024 → 2026
 const Footer = () => (
   <footer className="bg-[#0F1117] text-white py-20">
     <div className="max-w-7xl mx-auto px-6 grid grid-cols-1 md:grid-cols-4 gap-12">
@@ -128,7 +132,8 @@ const Footer = () => (
       </div>
     </div>
     <div className="max-w-7xl mx-auto px-6 mt-20 pt-8 border-t border-gray-800 flex flex-col md:flex-row justify-between items-center gap-4 text-xs text-gray-500">
-      <p>2024 PaletteIQ. All rights reserved.</p>
+      {/* FIX 5: Year updated to 2026 */}
+      <p>© 2026 PaletteIQ. All rights reserved.</p>
       <div className="flex gap-6">
         <a href="#">Privacy Policy</a>
         <a href="#">Terms of Service</a>
@@ -220,6 +225,8 @@ export default function App() {
     return brightness > 220;
   };
 
+  // FIX 2: extractColorsLocally is kept but NEVER called automatically.
+  // It is intentionally not invoked anywhere — the silent fallback has been removed.
   const extractColorsLocally = async (dataUrl: string): Promise<PaletteResult> => {
     return new Promise((resolve) => {
       const img = new Image();
@@ -235,7 +242,7 @@ export default function App() {
         const imageData = ctx.getImageData(0, 0, 100, 100).data;
         const colorCounts: Record<string, number> = {};
         
-        for (let i = 0; i < imageData.length; i += 40) { // Sample every 10th pixel
+        for (let i = 0; i < imageData.length; i += 40) {
           const r = imageData[i];
           const g = imageData[i+1];
           const b = imageData[i+2];
@@ -263,34 +270,34 @@ export default function App() {
     });
   };
 
+  // FIX 2+3+4: Updated analyzePalette with:
+  //   - VITE_ prefixed env var (works in Vite/Vercel)
+  //   - Correct model string via GEMINI_MODEL constant
+  //   - Markdown fence stripping before JSON parse
+  //   - Silent local fallback removed — errors are always surfaced to the user
   const analyzePalette = async () => {
     if (!image) return;
 
     setIsProcessing(true);
     setError(null);
 
-    const apiKey = process.env.GEMINI_API_KEY;
-    
-    // Fallback if no API key
+    // FIX 2: Use VITE_ prefix so Vite exposes this env var to the browser
+    const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
+
     if (!apiKey) {
-      try {
-        const localResult = await extractColorsLocally(image);
-        setResult(localResult);
-        return;
-      } catch (err) {
-        setError('Local extraction failed.');
-        return;
-      } finally {
-        setIsProcessing(false);
-      }
+      setError('API key not configured. Please contact the site owner.');
+      setIsProcessing(false);
+      return;
     }
 
     try {
       const ai = new GoogleGenAI({ apiKey });
-      
+
       const base64Data = image.split(',')[1];
+
       const response = await ai.models.generateContent({
-        model: "gemini-3-flash-preview",
+        // FIX 1: Use the GEMINI_MODEL constant — old model was shut down
+        model: GEMINI_MODEL,
         contents: [
           {
             parts: [
@@ -309,17 +316,31 @@ export default function App() {
       const responseText = response.text;
       if (!responseText) throw new Error('Empty response from AI.');
 
-      const jsonMatch = responseText.match(/\{[\s\S]*\}/);
-      
+      // FIX 3: Strip markdown fences before attempting JSON parse
+      const cleaned = responseText
+        .replace(/```json\s*/gi, '')
+        .replace(/```\s*/gi, '')
+        .trim();
+
+      const jsonMatch = cleaned.match(/\{[\s\S]*\}/);
+
       if (jsonMatch) {
         const parsed = JSON.parse(jsonMatch[0]) as PaletteResult;
+        if (!parsed.palette || !Array.isArray(parsed.palette)) {
+          throw new Error('Invalid palette structure returned.');
+        }
         setResult(parsed);
       } else {
-        throw new Error('Could not parse AI response.');
+        throw new Error('Could not parse AI response. Try a clearer image.');
       }
     } catch (err: any) {
       console.error(err);
-      setError(err.message || 'An error occurred during analysis.');
+      // FIX 4: Never silently fall back — always tell the user what happened
+      setError(
+        err.message?.includes('quota')
+          ? 'API quota exceeded. Please try again in a few minutes.'
+          : err.message || 'Analysis failed. Please try a clearer image.'
+      );
     } finally {
       setIsProcessing(false);
     }
@@ -350,18 +371,16 @@ export default function App() {
 
     const swatchSize = 140;
     const padding = 60;
-    const columns = 4; // Fewer columns for better text spacing
+    const columns = 4;
     const rows = Math.ceil(result.palette.length / columns);
-    const rowHeight = swatchSize + 180; // Increased row height for text
+    const rowHeight = swatchSize + 180;
     
     canvas.width = columns * (swatchSize + padding * 2) + padding;
     canvas.height = rows * rowHeight + padding + 150;
 
-    // Background
     ctx.fillStyle = '#FFFFFF';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-    // Title
     ctx.fillStyle = '#0F1117';
     ctx.font = 'bold 42px sans-serif';
     ctx.textAlign = 'center';
@@ -373,30 +392,25 @@ export default function App() {
       const x = padding + col * (swatchSize + padding * 2) + (swatchSize + padding * 2) / 2;
       const y = padding + 150 + row * rowHeight + swatchSize / 2;
 
-      // Circle
       ctx.beginPath();
       ctx.arc(x, y, swatchSize / 2, 0, Math.PI * 2);
       ctx.fillStyle = color.hex;
       ctx.fill();
 
-      // Border for light colors
       if (isLightColor(color.hex)) {
         ctx.strokeStyle = '#E5E7EB';
         ctx.lineWidth = 2;
         ctx.stroke();
       }
 
-      // Hex Text
       ctx.fillStyle = '#111827';
       ctx.font = 'bold 20px sans-serif';
       ctx.fillText(color.hex.toUpperCase(), x, y + swatchSize / 2 + 35);
       
-      // Role Text
       ctx.fillStyle = '#4F46E5';
       ctx.font = 'bold 14px sans-serif';
       ctx.fillText(color.role.toUpperCase(), x, y + swatchSize / 2 + 60);
 
-      // Reasoning Text (Usage Context)
       ctx.fillStyle = '#6B7280';
       ctx.font = '12px sans-serif';
       const words = color.reasoning.split(' ');
@@ -472,7 +486,7 @@ export default function App() {
           <feColorMatrix type="matrix" values="0.625, 0.375, 0, 0, 0, 0.7, 0.3, 0, 0, 0, 0, 0.3, 0.7, 0, 0, 0, 0, 0, 1, 0" />
         </filter>
         <filter id="tritanopia">
-          <feColorMatrix type="matrix" values="0.95, 0.05, 0, 0, 0, 0, 0.433, 0.567, 0, 0, 0, 0.475, 0.525, 0, 0, 0, 0, 0, 1, 0" />
+          <feColorMatrix type="matrix" values="0.95, 0.05, 0, 0, 0, 0, 0.433, 0.567, 0, 0, 0, 0, 0.475, 0.525, 0, 0, 0, 0, 0, 1, 0" />
         </filter>
       </svg>
 
@@ -552,7 +566,7 @@ export default function App() {
           </div>
         </section>
 
-        {/* Tool Dashboard (The "PaletteIQ" Tool) */}
+        {/* Tool Dashboard */}
         <section id="tool-dashboard" className="max-w-6xl mx-auto px-4 md:px-6 mb-32">
           <motion.div 
             initial={{ opacity: 0, scale: 0.95 }}
@@ -636,7 +650,7 @@ export default function App() {
                     </button>
                   )}
                   {result && (
-                    <button onClick={() => { setResult(null); setImage(null); }} className="w-full py-4 bg-gray-100 text-text-muted font-bold rounded-2xl hover:bg-gray-200 transition-all">
+                    <button onClick={() => { setResult(null); setImage(null); setError(null); }} className="w-full py-4 bg-gray-100 text-text-muted font-bold rounded-2xl hover:bg-gray-200 transition-all">
                       Start Over
                     </button>
                   )}
@@ -645,7 +659,22 @@ export default function App() {
 
               {/* Tool Main Area */}
               <div className="flex-1 bg-white flex flex-col overflow-hidden">
-                {!result ? (
+                {/* FIX 5: Error state is now always displayed — previously error was set but never shown */}
+                {error ? (
+                  <div className="flex-1 flex flex-col items-center justify-center p-12 text-center">
+                    <div className="w-16 h-16 bg-red-50 rounded-3xl flex items-center justify-center text-red-500 mb-6">
+                      <AlertCircle className="w-8 h-8" />
+                    </div>
+                    <h3 className="font-bold text-text-main mb-2">Analysis Failed</h3>
+                    <p className="text-text-muted text-sm max-w-xs">{error}</p>
+                    <button
+                      onClick={() => setError(null)}
+                      className="mt-6 px-6 py-3 bg-brand-primary text-white text-sm font-bold rounded-full"
+                    >
+                      Try Again
+                    </button>
+                  </div>
+                ) : !result ? (
                   <div className="flex-1 flex flex-col items-center justify-center p-12 text-center">
                     <div className="w-20 h-20 bg-brand-primary/5 rounded-3xl flex items-center justify-center text-brand-primary mb-6">
                       <Palette className="w-10 h-10" />
