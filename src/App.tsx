@@ -47,9 +47,6 @@ type ColorblindMode = 'none' | 'protanopia' | 'deuteranopia' | 'tritanopia' | 'a
 
 // --- Constants ---
 
-// FIX 1: Updated model string — gemini-3-flash-preview was shut down March 9, 2026
-const GEMINI_MODEL = "gemini-3.1-pro-preview";
-
 const GEMINI_PROMPT = `Analyze this data visualization. Extract 4–10 dominant colors. Return ONLY a JSON object:
 {
 "palette": [{ 
@@ -89,57 +86,6 @@ const Navbar = () => (
       </div>
     </div>
   </nav>
-);
-
-// FIX 5: Updated copyright year from 2024 → 2026
-const Footer = () => (
-  <footer className="bg-[#0F1117] text-white py-20">
-    <div className="max-w-7xl mx-auto px-6 grid grid-cols-1 md:grid-cols-4 gap-12">
-      <div className="col-span-1 md:col-span-2">
-        <div className="flex items-center gap-2 mb-6">
-          <Palette className="text-brand-primary w-6 h-6" />
-          <span className="text-xl font-bold">PaletteIQ</span>
-        </div>
-        <p className="text-gray-400 max-w-sm mb-8">
-          The ultimate color intelligence tool for data professionals. Extract, analyze, and export professional palettes in seconds.
-        </p>
-        <div className="flex gap-4">
-          {['twitter', 'linkedin', 'github'].map(social => (
-            <div key={social} className="w-10 h-10 bg-gray-800 rounded-full flex items-center justify-center hover:bg-brand-primary transition-colors cursor-pointer">
-              <span className="sr-only">{social}</span>
-              <div className="w-5 h-5 bg-gray-400 rounded-sm" />
-            </div>
-          ))}
-        </div>
-      </div>
-      
-      <div>
-        <h4 className="font-bold mb-6">Product</h4>
-        <ul className="space-y-4 text-gray-400 text-sm">
-          <li><a href="#" className="hover:text-white transition-colors">How it works</a></li>
-          <li><a href="#" className="hover:text-white transition-colors">Features</a></li>
-          <li><a href="#" className="hover:text-white transition-colors">API Access</a></li>
-        </ul>
-      </div>
-
-      <div>
-        <h4 className="font-bold mb-6">Newsletter</h4>
-        <p className="text-gray-400 text-sm mb-4">Get the latest updates on color theory and data viz design.</p>
-        <div className="flex gap-2">
-          <input type="email" placeholder="Enter your email" className="bg-gray-800 border-none rounded-lg px-4 py-2 text-sm flex-1 focus:ring-2 focus:ring-brand-primary outline-none" />
-          <button className="px-4 py-2 bg-brand-primary rounded-lg text-sm font-bold hover:bg-brand-secondary transition-colors">Join</button>
-        </div>
-      </div>
-    </div>
-    <div className="max-w-7xl mx-auto px-6 mt-20 pt-8 border-t border-gray-800 flex flex-col md:flex-row justify-between items-center gap-4 text-xs text-gray-500">
-      {/* FIX 5: Year updated to 2026 */}
-      <p>© 2026 PaletteIQ. All rights reserved.</p>
-      <div className="flex gap-6">
-        <a href="#">Privacy Policy</a>
-        <a href="#">Terms of Service</a>
-      </div>
-    </div>
-  </footer>
 );
 
 export default function App() {
@@ -225,63 +171,12 @@ export default function App() {
     return brightness > 220;
   };
 
-  // FIX 2: extractColorsLocally is kept but NEVER called automatically.
-  // It is intentionally not invoked anywhere — the silent fallback has been removed.
-  const extractColorsLocally = async (dataUrl: string): Promise<PaletteResult> => {
-    return new Promise((resolve) => {
-      const img = new Image();
-      img.onload = () => {
-        const canvas = document.createElement('canvas');
-        const ctx = canvas.getContext('2d');
-        if (!ctx) return;
-        
-        canvas.width = 100;
-        canvas.height = 100;
-        ctx.drawImage(img, 0, 0, 100, 100);
-        
-        const imageData = ctx.getImageData(0, 0, 100, 100).data;
-        const colorCounts: Record<string, number> = {};
-        
-        for (let i = 0; i < imageData.length; i += 40) {
-          const r = imageData[i];
-          const g = imageData[i+1];
-          const b = imageData[i+2];
-          const hex = `#${((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1)}`;
-          colorCounts[hex] = (colorCounts[hex] || 0) + 1;
-        }
-        
-        const sortedColors = Object.entries(colorCounts)
-          .sort((a, b) => b[1] - a[1])
-          .slice(0, 10)
-          .map(([hex]) => ({
-            hex,
-            role: 'Accent' as const,
-            reasoning: 'Extracted locally via pixel sampling.',
-            prominence: 'supporting' as const
-          }));
-          
-        resolve({
-          palette: sortedColors,
-          overall_style: 'Local Extraction (No AI)',
-          colorblind_notes: 'AI analysis unavailable. Using basic color sampling.'
-        });
-      };
-      img.src = dataUrl;
-    });
-  };
-
-  // FIX 2+3+4: Updated analyzePalette with:
-  //   - VITE_ prefixed env var (works in Vite/Vercel)
-  //   - Correct model string via GEMINI_MODEL constant
-  //   - Markdown fence stripping before JSON parse
-  //   - Silent local fallback removed — errors are always surfaced to the user
   const analyzePalette = async () => {
     if (!image) return;
 
     setIsProcessing(true);
     setError(null);
 
-    // FIX 2: Use VITE_ prefix so Vite exposes this env var to the browser
     const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
 
     if (!apiKey) {
@@ -292,12 +187,10 @@ export default function App() {
 
     try {
       const ai = new GoogleGenAI({ apiKey });
-
       const base64Data = image.split(',')[1];
 
       const response = await ai.models.generateContent({
-        // FIX 1: Use the GEMINI_MODEL constant — old model was shut down
-        model: GEMINI_MODEL,
+        model: "gemini-2.5-flash",
         contents: [
           {
             parts: [
@@ -310,32 +203,24 @@ export default function App() {
               }
             ]
           }
-        ]
+        ],
+        config: {
+          responseMimeType: "application/json", 
+        }
       });
 
       const responseText = response.text;
       if (!responseText) throw new Error('Empty response from AI.');
 
-      // FIX 3: Strip markdown fences before attempting JSON parse
-      const cleaned = responseText
-        .replace(/```json\s*/gi, '')
-        .replace(/```\s*/gi, '')
-        .trim();
-
-      const jsonMatch = cleaned.match(/\{[\s\S]*\}/);
-
-      if (jsonMatch) {
-        const parsed = JSON.parse(jsonMatch[0]) as PaletteResult;
-        if (!parsed.palette || !Array.isArray(parsed.palette)) {
-          throw new Error('Invalid palette structure returned.');
-        }
-        setResult(parsed);
-      } else {
-        throw new Error('Could not parse AI response. Try a clearer image.');
+      const parsed = JSON.parse(responseText) as PaletteResult;
+      
+      if (!parsed.palette || !Array.isArray(parsed.palette)) {
+        throw new Error('Invalid palette structure returned.');
       }
+      setResult(parsed);
+      
     } catch (err: any) {
       console.error(err);
-      // FIX 4: Never silently fall back — always tell the user what happened
       setError(
         err.message?.includes('quota')
           ? 'API quota exceeded. Please try again in a few minutes.'
@@ -574,7 +459,10 @@ export default function App() {
             transition={{ delay: 0.4, type: "spring", stiffness: 100 }}
             className="glass-card rounded-[2rem] md:rounded-[2.5rem] overflow-hidden shadow-2xl shadow-indigo-500/10 border border-white"
           >
-            <div className="flex flex-col md:flex-row min-h-[600px] md:h-[700px]">
+            {/* Fix for mobile spacing: Used h-auto md:h-[700px] min-h-min md:min-h-[600px] 
+              to ensure mobile wraps the content naturally instead of forcing fixed heights.
+            */}
+            <div className="flex flex-col md:flex-row h-auto md:h-[700px] min-h-min md:min-h-[600px]">
               {/* Tool Sidebar */}
               <aside className="w-full md:w-80 border-b md:border-b-0 md:border-r border-gray-100 bg-white/50 p-6 md:p-8 flex flex-col gap-6 md:gap-8">
                 <div>
@@ -659,7 +547,6 @@ export default function App() {
 
               {/* Tool Main Area */}
               <div className="flex-1 bg-white flex flex-col overflow-hidden">
-                {/* FIX 5: Error state is now always displayed — previously error was set but never shown */}
                 {error ? (
                   <div className="flex-1 flex flex-col items-center justify-center p-12 text-center">
                     <div className="w-16 h-16 bg-red-50 rounded-3xl flex items-center justify-center text-red-500 mb-6">
