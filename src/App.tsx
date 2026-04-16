@@ -95,6 +95,10 @@ export default function App() {
   const [result, setResult] = useState<PaletteResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
+  
+  // Mobile Interaction State
+  const [expandedSwatch, setExpandedSwatch] = useState<number | null>(null);
+  
   const [colorblindMode, setColorblindMode] = useState<ColorblindMode>('none');
   const [isDragging, setIsDragging] = useState(false);
   const [showTerms, setShowTerms] = useState(false);
@@ -151,6 +155,7 @@ export default function App() {
     }
     setError(null);
     setResult(null);
+    setExpandedSwatch(null);
     
     const processedDataUrl = await preprocessImage(file);
     setImage(processedDataUrl);
@@ -176,6 +181,7 @@ export default function App() {
 
     setIsProcessing(true);
     setError(null);
+    setExpandedSwatch(null);
 
     const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
 
@@ -190,7 +196,8 @@ export default function App() {
       const base64Data = image.split(',')[1];
 
       const response = await ai.models.generateContent({
-        model: "gemini-2.5-flash",
+        // Utilizing the 500 RPD 3.1-flash-lite model for high quota stability
+        model: "gemini-3.1-flash-lite-preview",
         contents: [
           {
             parts: [
@@ -459,9 +466,6 @@ export default function App() {
             transition={{ delay: 0.4, type: "spring", stiffness: 100 }}
             className="glass-card rounded-[2rem] md:rounded-[2.5rem] overflow-hidden shadow-2xl shadow-indigo-500/10 border border-white"
           >
-            {/* Fix for mobile spacing: Used h-auto md:h-[700px] min-h-min md:min-h-[600px] 
-              to ensure mobile wraps the content naturally instead of forcing fixed heights.
-            */}
             <div className="flex flex-col md:flex-row h-auto md:h-[700px] min-h-min md:min-h-[600px]">
               {/* Tool Sidebar */}
               <aside className="w-full md:w-80 border-b md:border-b-0 md:border-r border-gray-100 bg-white/50 p-6 md:p-8 flex flex-col gap-6 md:gap-8">
@@ -538,7 +542,7 @@ export default function App() {
                     </button>
                   )}
                   {result && (
-                    <button onClick={() => { setResult(null); setImage(null); setError(null); }} className="w-full py-4 bg-gray-100 text-text-muted font-bold rounded-2xl hover:bg-gray-200 transition-all">
+                    <button onClick={() => { setResult(null); setImage(null); setError(null); setExpandedSwatch(null); }} className="w-full py-4 bg-gray-100 text-text-muted font-bold rounded-2xl hover:bg-gray-200 transition-all">
                       Start Over
                     </button>
                   )}
@@ -585,6 +589,7 @@ export default function App() {
                           transition={{ delay: idx * 0.05 }}
                           className="flex flex-col items-center group"
                         >
+                          {/* Color Swatch (Copies Hex on click) */}
                           <div 
                             onClick={() => handleCopy(color.hex, idx)}
                             className={`
@@ -597,11 +602,25 @@ export default function App() {
                               {copiedIndex === idx ? <Check className="w-5 h-5 md:w-6 md:h-6 text-white mix-blend-difference" /> : <Copy className="w-5 h-5 md:w-6 md:h-6 text-white mix-blend-difference" />}
                             </div>
                           </div>
-                          <div className="mt-3 md:mt-4 text-center px-1">
+                          
+                          {/* Text Area (Expands reasoning on Mobile Click or Desktop Hover) */}
+                          <div 
+                            className="mt-3 md:mt-4 text-center px-1 w-full md:cursor-default cursor-pointer"
+                            onClick={() => setExpandedSwatch(expandedSwatch === idx ? null : idx)}
+                          >
                             <p className="text-xs md:text-sm font-black tracking-tight text-text-main uppercase">{color.hex}</p>
                             <p className="text-[9px] md:text-[10px] font-bold text-brand-primary uppercase tracking-widest mt-1">{color.role}</p>
-                            <p className="text-[8px] md:text-[9px] text-text-muted leading-tight mt-2 max-w-[100px] md:max-w-[120px] mx-auto line-clamp-2 md:line-clamp-3 group-hover:line-clamp-none transition-all">
+                            
+                            <p className={`
+                              text-[8px] md:text-[9px] text-text-muted leading-tight mt-2 max-w-[120px] mx-auto transition-all
+                              ${expandedSwatch === idx ? 'line-clamp-none' : 'line-clamp-2 md:line-clamp-3 md:group-hover:line-clamp-none'}
+                            `}>
                               {color.reasoning}
+                            </p>
+
+                            {/* Mobile visual cue to tap */}
+                            <p className="text-[7px] text-brand-primary/60 uppercase tracking-widest mt-2 md:hidden">
+                              {expandedSwatch === idx ? 'Tap to close' : 'Tap to read'}
                             </p>
                           </div>
                         </motion.div>
