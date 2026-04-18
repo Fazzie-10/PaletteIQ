@@ -61,7 +61,6 @@ export default function App() {
     });
   }, []);
 
-  // Timer for midnight reset
   useEffect(() => {
     if (credits === 0) {
       const interval = setInterval(() => {
@@ -154,7 +153,6 @@ export default function App() {
   };
 
   const analyzePalette = async () => {
-    // STRICT FRONTEND CUTOFF
     if (!image || !session || credits === 0) return;
     
     setIsProcessing(true); setError(null); setExpandedSwatch(null);
@@ -179,9 +177,107 @@ export default function App() {
     }
   };
 
-  const exportPowerBI = () => { /* remains identical */ };
-  const exportFigma = () => { /* remains identical */ };
-  const exportPaletteImage = () => { /* remains identical */ };
+  // FULLY RESTORED EXPORT LOGIC
+  const exportPowerBI = () => {
+    if (!result) return;
+    const theme = {
+      name: "PaletteIQ Theme",
+      dataColors: result.palette.filter(c => c.role.includes('Data')).map(c => c.hex),
+      background: result.palette.find(c => c.role === 'Background')?.hex || "#FFFFFF",
+      foreground: result.palette.find(c => c.role === 'Text')?.hex || "#000000",
+      tableAccent: result.palette.find(c => c.role === 'Accent')?.hex || result.palette[0].hex
+    };
+    const blob = new Blob([JSON.stringify(theme, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a'); a.href = url; a.download = 'paletteiq-powerbi.json'; a.click();
+  };
+
+  const exportFigma = () => {
+    if (!result) return;
+    const tokens = result.palette.reduce((acc: any, color) => {
+      acc[color.role.toLowerCase().replace(' ', '-')] = { value: color.hex, type: "color", description: color.reasoning };
+      return acc;
+    }, {});
+    const blob = new Blob([JSON.stringify(tokens, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a'); a.href = url; a.download = 'paletteiq-figma.json'; a.click();
+  };
+
+  const exportPaletteImage = () => {
+    if (!result) return;
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    const swatchSize = 140;
+    const padding = 60;
+    const columns = 4;
+    const rows = Math.ceil(result.palette.length / columns);
+    const rowHeight = swatchSize + 180;
+    
+    canvas.width = columns * (swatchSize + padding * 2) + padding;
+    canvas.height = rows * rowHeight + padding + 150;
+
+    ctx.fillStyle = '#FFFFFF';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    ctx.fillStyle = '#0F1117';
+    ctx.font = 'bold 42px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('PaletteIQ Color Intelligence', canvas.width / 2, 80);
+
+    result.palette.forEach((color, i) => {
+      const col = i % columns;
+      const row = Math.floor(i / columns);
+      const x = padding + col * (swatchSize + padding * 2) + (swatchSize + padding * 2) / 2;
+      const y = padding + 150 + row * rowHeight + swatchSize / 2;
+
+      ctx.beginPath();
+      ctx.arc(x, y, swatchSize / 2, 0, Math.PI * 2);
+      ctx.fillStyle = color.hex;
+      ctx.fill();
+
+      if (isLightColor(color.hex)) {
+        ctx.strokeStyle = '#E5E7EB';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+      }
+
+      ctx.fillStyle = '#111827';
+      ctx.font = 'bold 20px sans-serif';
+      ctx.fillText(color.hex.toUpperCase(), x, y + swatchSize / 2 + 35);
+      
+      ctx.fillStyle = '#4F46E5';
+      ctx.font = 'bold 14px sans-serif';
+      ctx.fillText(color.role.toUpperCase(), x, y + swatchSize / 2 + 60);
+
+      ctx.fillStyle = '#6B7280';
+      ctx.font = '12px sans-serif';
+      const words = color.reasoning.split(' ');
+      let line = '';
+      let lineCount = 0;
+      const maxWidth = swatchSize + 40;
+      
+      for (let n = 0; n < words.length; n++) {
+        const testLine = line + words[n] + ' ';
+        const metrics = ctx.measureText(testLine);
+        if (metrics.width > maxWidth && n > 0) {
+          ctx.fillText(line, x, y + swatchSize / 2 + 85 + (lineCount * 18));
+          line = words[n] + ' ';
+          lineCount++;
+        } else {
+          line = testLine;
+        }
+      }
+      ctx.fillText(line, x, y + swatchSize / 2 + 85 + (lineCount * 18));
+    });
+
+    const url = canvas.toDataURL('image/png');
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'paletteiq-export.png';
+    a.click();
+  };
 
   const getColorblindFilter = () => {
     switch (colorblindMode) {
@@ -299,7 +395,7 @@ export default function App() {
           ) : (
             <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="glass-card rounded-[2rem] md:rounded-[2.5rem] overflow-hidden shadow-2xl border border-white">
               <div className="flex flex-col md:flex-row h-auto md:h-[700px] min-h-min md:min-h-[600px]">
-                <aside className="w-full md:w-80 border-b md:border-b-0 md:border-r border-gray-100 bg-white/50 p-6 md:p-8 flex flex-col gap-6 md:gap-8">
+                <aside className="w-full md:w-80 border-b md:border-b-0 md:border-r border-gray-100 bg-white/50 p-6 md:p-8 flex flex-col gap-6 md:gap-8 overflow-y-auto">
                   <div>
                     <h3 className="text-xs font-bold text-text-muted uppercase tracking-widest mb-6">Source Analysis</h3>
                     <div 
@@ -345,7 +441,7 @@ export default function App() {
                     </div>
                   )}
 
-                  <div className="mt-auto">
+                  <div className="mt-auto pt-4">
                     {!result && image && !isProcessing && (
                       <button 
                         onClick={analyzePalette} 
@@ -357,11 +453,18 @@ export default function App() {
                         {credits === 0 ? '0 Credits Remaining' : 'Analyze (1 Credit)'}
                       </button>
                     )}
+                    
+                    {/* MOVED: Export Buttons in the Sidebar */}
                     {result && (
                       <div className="space-y-3">
-                        <button onClick={() => { setResult(null); setImage(null); setError(null); }} className="w-full py-3 bg-gray-100 text-text-muted text-sm font-bold rounded-xl hover:bg-gray-200 transition-all">
-                          Start Over
-                        </button>
+                        <button onClick={exportPowerBI} className="w-full py-3 bg-yellow-50 text-yellow-600 border border-yellow-200 text-sm font-bold rounded-xl hover:bg-yellow-100 transition-all flex items-center justify-center gap-2"><Table className="w-4 h-4" /> Export Power BI</button>
+                        <button onClick={exportFigma} className="w-full py-3 bg-indigo-50 text-indigo-600 border border-indigo-200 text-sm font-bold rounded-xl hover:bg-indigo-100 transition-all flex items-center justify-center gap-2"><Layers className="w-4 h-4" /> Export Figma</button>
+                        <button onClick={exportPaletteImage} className="w-full py-3 bg-emerald-50 text-emerald-600 border border-emerald-200 text-sm font-bold rounded-xl hover:bg-emerald-100 transition-all flex items-center justify-center gap-2"><Copy className="w-4 h-4" /> Export Image</button>
+                        <div className="pt-4 border-t border-gray-100 mt-4">
+                          <button onClick={() => { setResult(null); setImage(null); setError(null); }} className="w-full py-3 bg-gray-100 text-text-muted text-sm font-bold rounded-xl hover:bg-gray-200 transition-all">
+                            Start Over
+                          </button>
+                        </div>
                       </div>
                     )}
                   </div>
@@ -392,26 +495,32 @@ export default function App() {
                     </div>
                   ) : (
                     <div className="flex-1 p-6 md:p-12 overflow-y-auto bg-gray-50/30" style={{ filter: getColorblindFilter() }}>
-                       <div className="text-center mb-8 md:mb-12">
+                       
+                       <div className="text-center mb-8">
                         <h2 className="text-2xl md:text-3xl font-black tracking-tight mb-2">Extracted Palette</h2>
+                        {/* COLOR COUNT DISPLAY ADDED */}
+                        <p className="inline-flex items-center gap-1 px-3 py-1 bg-brand-primary/10 text-brand-primary rounded-full text-xs font-bold uppercase tracking-widest mt-2">
+                          <Zap className="w-3 h-3" /> {result.palette.length} Colors Identified
+                        </p>
                       </div>
                       
-                      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-y-8 md:gap-y-12 gap-x-4 md:gap-x-8">
+                      {/* COMPACT UI GRID */}
+                      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-5 gap-y-6 gap-x-4">
                         {result.palette.map((color, idx) => (
                           <motion.div key={idx} initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: idx * 0.05 }} className="flex flex-col items-center group">
                             <div 
                               onClick={() => handleCopy(color.hex, idx)}
-                              className={`w-16 h-16 md:w-24 md:h-24 rounded-full shadow-lg cursor-pointer transition-transform hover:scale-110 active:scale-95 relative flex items-center justify-center ${isLightColor(color.hex) ? 'border border-gray-200' : ''}`}
+                              className={`w-12 h-12 md:w-16 md:h-16 rounded-full shadow-md cursor-pointer transition-transform hover:scale-110 active:scale-95 relative flex items-center justify-center ${isLightColor(color.hex) ? 'border border-gray-200' : ''}`}
                               style={{ backgroundColor: color.hex }}
                             >
                               <div className="opacity-0 group-hover:opacity-100 transition-opacity">
-                                {copiedIndex === idx ? <Check className="w-5 h-5 text-white mix-blend-difference" /> : <Copy className="w-5 h-5 text-white mix-blend-difference" />}
+                                {copiedIndex === idx ? <Check className="w-4 h-4 text-white mix-blend-difference" /> : <Copy className="w-4 h-4 text-white mix-blend-difference" />}
                               </div>
                             </div>
-                            <div className="mt-3 md:mt-4 text-center px-1 w-full md:cursor-default cursor-pointer" onClick={() => setExpandedSwatch(expandedSwatch === idx ? null : idx)}>
-                              <p className="text-xs md:text-sm font-black tracking-tight text-text-main uppercase">{color.hex}</p>
-                              <p className="text-[9px] md:text-[10px] font-bold text-brand-primary uppercase tracking-widest mt-1">{color.role}</p>
-                              <p className={`text-[8px] md:text-[9px] text-text-muted leading-tight mt-2 max-w-[120px] mx-auto transition-all ${expandedSwatch === idx ? 'line-clamp-none' : 'line-clamp-2 md:line-clamp-3 md:group-hover:line-clamp-none'}`}>
+                            <div className="mt-3 text-center w-full">
+                              <p className="text-xs font-black tracking-tight text-text-main uppercase">{color.hex}</p>
+                              <p className="text-[9px] font-bold text-brand-primary uppercase tracking-widest mt-0.5">{color.role}</p>
+                              <p className="text-[9px] text-text-muted leading-tight mt-1.5 px-1 md:group-hover:line-clamp-none line-clamp-2 transition-all">
                                 {color.reasoning}
                               </p>
                             </div>
@@ -419,19 +528,13 @@ export default function App() {
                         ))}
                       </div>
 
-                      <div className="mt-12 md:mt-16 p-6 bg-white rounded-2xl border border-gray-100 shadow-sm">
-                        <h4 className="text-xs font-bold text-text-muted uppercase tracking-widest mb-3">AI Insights</h4>
-                        <p className="text-xs md:text-sm text-text-main leading-relaxed">{result.overall_style}</p>
+                      <div className="mt-10 p-5 bg-white rounded-2xl border border-gray-100 shadow-sm">
+                        <h4 className="text-xs font-bold text-text-muted uppercase tracking-widest mb-2">AI Insights</h4>
+                        <p className="text-sm text-text-main leading-relaxed">{result.overall_style}</p>
                         <div className="mt-4 pt-4 border-t border-gray-50 flex items-start gap-2 text-amber-600">
                           <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
-                          <p className="text-[10px] md:text-xs font-medium">{result.colorblind_notes}</p>
+                          <p className="text-xs font-medium">{result.colorblind_notes}</p>
                         </div>
-                      </div>
-
-                      <div className="mt-8 flex flex-wrap justify-center gap-4">
-                         <button onClick={exportPowerBI} className="px-4 py-2 bg-yellow-500 text-white text-xs font-bold rounded-lg shadow-md hover:bg-yellow-600 transition-colors flex items-center gap-2"><Table className="w-4 h-4" /> Export Power BI</button>
-                         <button onClick={exportFigma} className="px-4 py-2 bg-indigo-500 text-white text-xs font-bold rounded-lg shadow-md hover:bg-indigo-600 transition-colors flex items-center gap-2"><Layers className="w-4 h-4" /> Export Figma</button>
-                         <button onClick={exportPaletteImage} className="px-4 py-2 bg-emerald-500 text-white text-xs font-bold rounded-lg shadow-md hover:bg-emerald-600 transition-colors flex items-center gap-2"><Copy className="w-4 h-4" /> Export Image</button>
                       </div>
                     </div>
                   )}
@@ -484,7 +587,7 @@ export default function App() {
           </div>
         </section>
 
-        {/* Pricing Section (Updated to user specifications) */}
+        {/* Pricing Section */}
         <section id="pricing" className="max-w-7xl mx-auto px-6 mb-32">
           <div className="text-center mb-20">
             <h2 className="text-4xl md:text-5xl font-extrabold mt-4 mb-6">Simple, Transparent Plans</h2>

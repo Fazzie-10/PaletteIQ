@@ -30,7 +30,6 @@ export default async function handler(req: any, res: any) {
     const today = new Date().toISOString().split('T')[0];
     let currentCredits = profile.credits;
 
-    // INCREASED TO 5 CREDITS
     if (!profile.last_reset_date || profile.last_reset_date < today) {
       currentCredits = 5;
       await supabase.from('profiles').update({ 
@@ -39,13 +38,15 @@ export default async function handler(req: any, res: any) {
       }).eq('id', user.id);
     }
 
-    // STRICT CUTOFF
     if (currentCredits <= 0) throw new Error('quota_exceeded');
 
     const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! });
     
-    // UPDATED PROMPT FOR MAXIMUM DETAIL
-    const GEMINI_PROMPT = `Analyze this data visualization with high precision. Extract 4–10 dominant colors. Return ONLY a JSON object:
+    // THE FIX: Stricter, exhaustive prompt with no limits.
+    const GEMINI_PROMPT = `Analyze this data visualization with absolute precision and exhaustiveness. 
+    Extract ALL visually distinct and meaningful colors used in the image. You MUST capture the Background color, Text colors, Grid lines, and EVERY distinct color used for Data points (bars, lines, bubbles) and Accents. Do not skip any prominent colors.
+    
+    Return ONLY a JSON object:
     {
     "palette": [{ "hex": "#RRGGBB", "role": "Background|Primary Data|Secondary Data|Accent|Text|Grid", "reasoning": "Provide a detailed, highly accurate explanation of exactly what this color represents in the visual hierarchy.", "prominence": "dominant|supporting|accent" }],
     "overall_style": "Provide a detailed summary of the aesthetic and color theory.",
