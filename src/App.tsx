@@ -887,7 +887,7 @@ export default function App() {
               {
                 icon: <Zap className="w-6 h-6" />,
                 title: 'Semantic Role Extraction',
-                desc: 'The AI doesn't just extract colors — it tells you which is the Background, which is Primary Data, which is an Alert Accent. Roles you can act on immediately.',
+                desc: "The AI doesn't just extract colors — it tells you which is the Background, which is Primary Data, which is an Alert Accent. Roles you can act on immediately.",
               },
               {
                 icon: <Shield className="w-6 h-6" />,
