@@ -12,7 +12,6 @@ export default async function handler(req: any, res: any) {
       return res.status(400).json({ error: "No image data provided." });
     }
 
-    // --- Auth ---
     const authHeader = req.headers.authorization;
     if (!authHeader) {
       return res.status(401).json({ error: "Please log in to use this tool." });
@@ -29,7 +28,6 @@ export default async function handler(req: any, res: any) {
       return res.status(401).json({ error: "Session expired. Please log in again." });
     }
 
-    // --- Credit Logic ---
     const { data: profile, error: profileError } = await supabase
       .from("profiles")
       .select("credits, last_reset_date")
@@ -37,7 +35,6 @@ export default async function handler(req: any, res: any) {
       .single();
 
     if (profileError || !profile) {
-      console.error("Profile fetch error:", profileError);
       return res.status(500).json({ error: "Could not load your profile. Please try logging out and back in." });
     }
 
@@ -58,38 +55,30 @@ export default async function handler(req: any, res: any) {
       });
     }
 
-    // --- Gemini API Call (direct fetch) ---
-    const GEMINI_PROMPT = `You are an expert data visualization designer and color theorist.
-Analyze this dashboard or infographic image with absolute precision.
+    // THE FIX: Ultra-strict, exhaustive eyedropper prompt
+    const GEMINI_PROMPT = `You are an expert color extraction algorithm and data visualization analyst.
+Your task is to analyze the provided image and extract the EXACT hex codes for every meaningful color present. 
 
-Your task:
-1. Extract EVERY visually distinct and intentional color including background, text, grid lines, chart bars/lines, accents, and highlights.
-2. Assign each color a semantic role from this list: Background | Primary Data | Secondary Data | Accent | Text | Grid
-3. Explain precisely WHY this color was used in a data visualization context.
-4. Assess colorblind accessibility in plain everyday language.
+CRITICAL INSTRUCTIONS:
+1. EXTRACT EXACT HEX CODES: Do not guess or approximate. Extract the literal hex codes used for the background, text, grid lines, data points (bars, lines, bubbles), and highlights. 
+2. EXHAUSTIVE EXTRACTION: Find EVERY distinct color. Do not stop at 5. If there are 12 colors, extract 12. If there are 15, extract 15. Do not skip any prominent colors.
+3. HIGHLY DETAILED REASONING: For EVERY color, write a comprehensive, highly detailed 2 to 3 sentence explanation. Explain exactly what data point, category, or UI element this color represents, why it was chosen, and how it functions in the visual hierarchy.
+4. NO HALLUCINATIONS: Ensure the hex codes represent the actual pixels in the image.
 
-Rules:
-- Extract between 5 and 12 colors. Capture all meaningful colors, do not skip any.
-- Do not extract near-identical shades as separate colors.
-- Hex codes must be exact 6 characters uppercase after #.
-- Return ONLY valid JSON. No markdown, no explanation outside the JSON.
-
-Return this exact structure:
+Return ONLY valid JSON.
 {
   "palette": [
     {
       "hex": "#RRGGBB",
-      "role": "Background",
-      "reasoning": "One to two sentences explaining the design intent behind this color in this specific visualization.",
-      "prominence": "dominant"
+      "role": "Background|Primary Data|Secondary Data|Accent|Text|Grid",
+      "reasoning": "Detailed 2-3 sentence analysis of this specific color's role, usage, and impact in the chart.",
+      "prominence": "dominant|supporting|accent"
     }
   ],
-  "overall_style": "Two to three sentences summarizing the overall color strategy, aesthetic, and design philosophy of this dashboard or infographic.",
-  "colorblind_notes": "Plain language assessment. State whether the palette is safe for people with red-green color blindness or blue-yellow color blindness. Give one concrete suggestion if there is a problem."
+  "overall_style": "Detailed 2-3 sentence summary of the aesthetic and color theory.",
+  "colorblind_notes": "Plain language accessibility assessment."
 }`;
 
-    // FIX 1: Reverted to gemini-3.1-flash-lite-preview (500 RPD Quota)
-    // FIX 2: Used camelCase (inlineData and mimeType) for the Google REST payload
     const geminiRes = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite-preview:generateContent?key=${process.env.GEMINI_API_KEY}`,
       {
@@ -110,21 +99,17 @@ Return this exact structure:
     );
 
     if (!geminiRes.ok) {
-      const errText = await geminiRes.text();
-      console.error("Gemini API error:", geminiRes.status, errText);
       return res.status(502).json({ error: "AI service error. Please try again in a moment." });
     }
 
     const geminiData = await geminiRes.json();
     const rawText = geminiData?.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
 
-    // Parse and validate
     let result;
     try {
       const clean = rawText.replace(/```json|```/g, "").trim();
       result = JSON.parse(clean);
     } catch (parseError) {
-      console.error("JSON parse error:", parseError, "Raw text:", rawText);
       return res.status(500).json({
         error: "AI returned an unexpected format. Please try again with a clearer image.",
       });
@@ -136,25 +121,17 @@ Return this exact structure:
       });
     }
 
-    // --- Deduct credit ONLY after successful analysis ---
-    const { error: deductError } = await supabase
+    await supabase
       .from("profiles")
       .update({ credits: currentCredits - 1 })
       .eq("id", user.id);
 
-    if (deductError) {
-      console.error("Credit deduction error:", deductError);
-    }
-
     return res.status(200).json(result);
 
   } catch (error: any) {
-    console.error("Unhandled API error:", error.message, error);
-
     if (error.message?.includes("quota") || error.message?.includes("429")) {
       return res.status(429).json({ error: "AI service is busy right now. Please try again in a moment." });
     }
-
     return res.status(500).json({ error: "Analysis failed. Please try a clearer image or a different file." });
   }
 }

@@ -6,8 +6,6 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
-// ─── Types ────────────────────────────────────────────────────────────────────
-
 interface ColorInfo {
   hex: string;
   role: 'Background' | 'Primary Data' | 'Secondary Data' | 'Accent' | 'Text' | 'Grid';
@@ -23,8 +21,6 @@ interface PaletteResult {
 
 type ColorblindMode = 'none' | 'red-blind' | 'green-blind' | 'blue-blind' | 'monochrome';
 
-// ─── Role colour map ──────────────────────────────────────────────────────────
-
 const ROLE_COLORS: Record<string, string> = {
   'Background':     'bg-slate-100 text-slate-600',
   'Primary Data':   'bg-indigo-100 text-indigo-700',
@@ -33,8 +29,6 @@ const ROLE_COLORS: Record<string, string> = {
   'Text':           'bg-gray-800 text-gray-100',
   'Grid':           'bg-gray-100 text-gray-500',
 };
-
-// ─── Helpers ──────────────────────────────────────────────────────────────────
 
 const isLightColor = (hex: string): boolean => {
   const r = parseInt(hex.slice(1, 3), 16);
@@ -46,10 +40,7 @@ const isLightColor = (hex: string): boolean => {
 const slugify = (str: string) =>
   str.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
 
-// ─── App ──────────────────────────────────────────────────────────────────────
-
 export default function App() {
-  // Auth
   const [session, setSession] = useState<any>(null);
   const [credits, setCredits] = useState<number | null>(null);
   const [timeUntilReset, setTimeUntilReset] = useState('');
@@ -60,7 +51,6 @@ export default function App() {
   const [isAuthLoading, setIsAuthLoading] = useState(false);
   const [authMessage, setAuthMessage] = useState<{ text: string; type: 'error' | 'success' } | null>(null);
 
-  // Tool
   const [image, setImage] = useState<string | null>(null);
   const [fileName, setFileName] = useState<string>('');
   const [wasUpscaled, setWasUpscaled] = useState(false);
@@ -73,8 +63,6 @@ export default function App() {
   const [isDragging, setIsDragging] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
-
-  // ─── Auth & session ────────────────────────────────────────────────────────
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -89,7 +77,6 @@ export default function App() {
     return () => subscription.unsubscribe();
   }, []);
 
-  // Countdown when out of credits
   useEffect(() => {
     if (credits !== 0) return;
     const interval = setInterval(() => {
@@ -111,10 +98,9 @@ export default function App() {
       .eq('id', userId)
       .single();
 
-    if (error) { console.error('fetchCredits error:', error); return; }
+    if (error) return;
     if (!data) return;
 
-    // Client-side optimistic reset display (server will also reset on next API call)
     const today = new Date().toISOString().split('T')[0];
     if (!data.last_reset_date || data.last_reset_date < today) {
       setCredits(5);
@@ -154,8 +140,6 @@ export default function App() {
     await supabase.auth.signOut();
     setResult(null); setImage(null); setError(null); setCredits(null);
   };
-
-  // ─── Image handling ────────────────────────────────────────────────────────
 
   const preprocessImage = async (file: File): Promise<{ dataUrl: string; upscaled: boolean }> => {
     return new Promise((resolve) => {
@@ -205,8 +189,6 @@ export default function App() {
     if (file) handleFileUpload(file);
   }, []);
 
-  // ─── Analysis ──────────────────────────────────────────────────────────────
-
   const analyzePalette = async () => {
     if (!image || !session || credits === 0) return;
     setIsProcessing(true); setError(null);
@@ -226,7 +208,6 @@ export default function App() {
       if (!response.ok) throw new Error(data.error || 'Analysis failed');
 
       setResult(data);
-      // Refresh credits from DB after deduction
       fetchCredits(session.user.id);
     } catch (err: any) {
       setError(err.message);
@@ -234,8 +215,6 @@ export default function App() {
       setIsProcessing(false);
     }
   };
-
-  // ─── Exports ───────────────────────────────────────────────────────────────
 
   const copyToClipboard = (text: string, key: string) => {
     navigator.clipboard.writeText(text);
@@ -285,62 +264,96 @@ export default function App() {
     URL.revokeObjectURL(url);
   };
 
+  // THE FIX: Completely redesigned export image to allow for full detailed reasoning!
   const exportPaletteImage = () => {
     if (!result) return;
     const canvas = document.createElement('canvas');
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    const cols = 4;
-    const swatchSize = 120;
-    const pad = 40;
-    const rowH = swatchSize + 120;
-    const rows = Math.ceil(result.palette.length / cols);
+    // We now use a beautiful VERTICAL list layout instead of a grid so text doesn't cut off
+    const width = 1200;
+    const itemHeight = 180;
+    const headerHeight = 160;
+    const footerHeight = 120;
+    const height = headerHeight + (result.palette.length * itemHeight) + footerHeight;
 
-    canvas.width = cols * (swatchSize + pad * 2) + pad;
-    canvas.height = rows * rowH + pad + 120;
+    canvas.width = width;
+    canvas.height = height;
 
+    // Background
     ctx.fillStyle = '#F8FAFC';
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.fillRect(0, 0, width, height);
 
+    // Header
     ctx.fillStyle = '#0F1117';
-    ctx.font = 'bold 28px sans-serif';
-    ctx.textAlign = 'center';
-    ctx.fillText('PaletteIQ — Color Intelligence', canvas.width / 2, 60);
+    ctx.font = 'bold 48px sans-serif';
+    ctx.textAlign = 'left';
+    ctx.fillText('PaletteIQ Color Intelligence', 100, 90);
+    
     ctx.fillStyle = '#6C63FF';
-    ctx.font = '14px sans-serif';
-    ctx.fillText('paletteiq.vercel.app', canvas.width / 2, 85);
+    ctx.font = 'bold 22px sans-serif';
+    ctx.fillText('paletteiq.vercel.app', 100, 130);
 
+    // Colors
     result.palette.forEach((color, i) => {
-      const col = i % cols;
-      const row = Math.floor(i / cols);
-      const cx = pad + col * (swatchSize + pad * 2) + (swatchSize + pad * 2) / 2;
-      const cy = 120 + row * rowH + swatchSize / 2;
+      const y = headerHeight + (i * itemHeight);
 
-      // Swatch circle
+      // Swatch
       ctx.beginPath();
-      ctx.arc(cx, cy, swatchSize / 2, 0, Math.PI * 2);
+      ctx.arc(160, y + 80, 60, 0, Math.PI * 2);
       ctx.fillStyle = color.hex;
       ctx.fill();
       if (isLightColor(color.hex)) {
-        ctx.strokeStyle = '#E5E7EB'; ctx.lineWidth = 1.5; ctx.stroke();
+        ctx.strokeStyle = '#E5E7EB'; ctx.lineWidth = 2; ctx.stroke();
       }
 
-      ctx.textAlign = 'center';
+      // Hex Text
+      ctx.textAlign = 'left';
       ctx.fillStyle = '#111827';
-      ctx.font = 'bold 13px monospace';
-      ctx.fillText(color.hex.toUpperCase(), cx, cy + swatchSize / 2 + 22);
+      ctx.font = 'bold 32px monospace';
+      ctx.fillText(color.hex.toUpperCase(), 260, y + 60);
 
+      // Role Text
       ctx.fillStyle = '#6C63FF';
-      ctx.font = 'bold 11px sans-serif';
-      ctx.fillText(color.role.toUpperCase(), cx, cy + swatchSize / 2 + 40);
+      ctx.font = 'bold 18px sans-serif';
+      ctx.fillText(color.role.toUpperCase(), 430, y + 57);
+
+      // Word-wrapped Detailed Reasoning (Massive 800px width limit)
+      ctx.fillStyle = '#475569';
+      ctx.font = '20px sans-serif';
+      const words = color.reasoning.split(' ');
+      let line = '';
+      let lineCount = 0;
+      const maxWidth = 820; 
+      
+      for (let n = 0; n < words.length; n++) {
+        const testLine = line + words[n] + ' ';
+        const metrics = ctx.measureText(testLine);
+        if (metrics.width > maxWidth && n > 0) {
+          ctx.fillText(line, 260, y + 100 + (lineCount * 30));
+          line = words[n] + ' ';
+          lineCount++;
+        } else {
+          line = testLine;
+        }
+      }
+      ctx.fillText(line, 260, y + 100 + (lineCount * 30));
+
+      // Divider Line
+      if (i < result.palette.length - 1) {
+        ctx.beginPath();
+        ctx.moveTo(100, y + itemHeight);
+        ctx.lineTo(1100, y + itemHeight);
+        ctx.strokeStyle = '#E2E8F0';
+        ctx.lineWidth = 1;
+        ctx.stroke();
+      }
     });
 
     const url = canvas.toDataURL('image/png');
-    const a = document.createElement('a'); a.href = url; a.download = 'paletteiq-palette.png'; a.click();
+    const a = document.createElement('a'); a.href = url; a.download = 'paletteiq-detailed-report.png'; a.click();
   };
-
-  // ─── Colorblind filter ─────────────────────────────────────────────────────
 
   const getColorblindFilter = () => {
     switch (colorblindMode) {
@@ -356,12 +369,8 @@ export default function App() {
     document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' });
   };
 
-  // ─── Render ────────────────────────────────────────────────────────────────
-
   return (
     <div className="min-h-screen flex flex-col bg-[#F5F4F0] text-[#0F1117] font-sans">
-
-      {/* SVG filters for colorblind simulation */}
       <svg className="hidden" aria-hidden="true">
         <defs>
           <filter id="protanopia">
@@ -376,7 +385,6 @@ export default function App() {
         </defs>
       </svg>
 
-      {/* ── Nav ──────────────────────────────────────────────────────────────── */}
       <nav className="fixed top-0 left-0 right-0 z-50 bg-white/80 backdrop-blur-md border-b border-gray-200">
         <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
           <div className="flex items-center gap-2">
@@ -436,8 +444,6 @@ export default function App() {
       </nav>
 
       <main className="flex-1 pt-24">
-
-        {/* ── Hero ───────────────────────────────────────────────────────────── */}
         <section className="max-w-7xl mx-auto px-6 text-center mb-16 pt-10">
           <motion.a
             href="https://linktr.ee/AnalystFemi"
@@ -485,11 +491,9 @@ export default function App() {
           </motion.div>
         </section>
 
-        {/* ── Tool Dashboard ─────────────────────────────────────────────────── */}
         <section id="tool-dashboard" className="max-w-6xl mx-auto px-4 md:px-6 mb-32 scroll-mt-24">
           <AnimatePresence mode="wait">
             {!session ? (
-              /* ── Auth Card ── */
               <motion.div
                 key="auth"
                 initial={{ opacity: 0, scale: 0.96 }}
@@ -552,7 +556,6 @@ export default function App() {
                 </p>
               </motion.div>
             ) : (
-              /* ── Main Tool ── */
               <motion.div
                 key="tool"
                 initial={{ opacity: 0, scale: 0.97 }}
@@ -560,11 +563,7 @@ export default function App() {
                 className="bg-white rounded-3xl overflow-hidden shadow-2xl border border-gray-100"
               >
                 <div className="flex flex-col md:flex-row" style={{ minHeight: '680px' }}>
-
-                  {/* Sidebar */}
                   <aside className="w-full md:w-72 border-b md:border-b-0 md:border-r border-gray-100 bg-gray-50/60 p-6 flex flex-col gap-6">
-                    
-                    {/* Upload zone */}
                     <div>
                       <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3">Upload Visualization</p>
                       <div
@@ -625,7 +624,6 @@ export default function App() {
                       )}
                     </div>
 
-                    {/* Analyze button */}
                     {image && !result && !isProcessing && (
                       <button
                         onClick={analyzePalette}
@@ -641,7 +639,6 @@ export default function App() {
                       </button>
                     )}
 
-                    {/* Colorblind modes */}
                     {result && (
                       <div>
                         <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3">Accessibility Preview</p>
@@ -663,7 +660,6 @@ export default function App() {
                       </div>
                     )}
 
-                    {/* Export buttons */}
                     {result && (
                       <div className="space-y-2 mt-auto">
                         <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3">Export</p>
@@ -697,7 +693,7 @@ export default function App() {
                           onClick={exportPaletteImage}
                           className="w-full py-2.5 bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs font-bold rounded-xl hover:bg-emerald-100 transition-all flex items-center justify-center gap-2"
                         >
-                          <Image className="w-3.5 h-3.5" /> Export as PNG
+                          <Image className="w-3.5 h-3.5" /> Export as PNG Report
                         </button>
                         <button
                           onClick={() => { setResult(null); setImage(null); setError(null); setFileName(''); setWasUpscaled(false); }}
@@ -709,10 +705,8 @@ export default function App() {
                     )}
                   </aside>
 
-                  {/* Main panel */}
                   <div className="flex-1 bg-white flex flex-col overflow-hidden">
                     <AnimatePresence mode="wait">
-
                       {credits === 0 && !result ? (
                         <motion.div key="nocredits" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
                           className="flex-1 flex flex-col items-center justify-center p-12 text-center">
@@ -731,7 +725,6 @@ export default function App() {
                             Upgrade to Pro →
                           </button>
                         </motion.div>
-
                       ) : error ? (
                         <motion.div key="error" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
                           className="flex-1 flex flex-col items-center justify-center p-12 text-center">
@@ -747,7 +740,6 @@ export default function App() {
                             Try Again
                           </button>
                         </motion.div>
-
                       ) : !result ? (
                         <motion.div key="empty" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
                           className="flex-1 flex flex-col items-center justify-center p-12 text-center">
@@ -766,9 +758,7 @@ export default function App() {
                             ))}
                           </div>
                         </motion.div>
-
                       ) : (
-                        /* Results */
                         <motion.div key="results" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
                           className="flex-1 p-6 md:p-10 overflow-y-auto"
                           style={{ filter: getColorblindFilter() }}
@@ -780,7 +770,6 @@ export default function App() {
                             </span>
                           </div>
 
-                          {/* Swatches grid */}
                           <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-5 gap-5 mb-10">
                             {result.palette.map((color, idx) => (
                               <motion.div
@@ -822,7 +811,6 @@ export default function App() {
                             ))}
                           </div>
 
-                          {/* AI Insights */}
                           <div className="p-5 bg-gray-50 rounded-2xl border border-gray-100">
                             <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">AI Insights</p>
                             <p className="text-sm text-gray-700 leading-relaxed">{result.overall_style}</p>
@@ -833,7 +821,6 @@ export default function App() {
                           </div>
                         </motion.div>
                       )}
-
                     </AnimatePresence>
                   </div>
                 </div>
@@ -842,7 +829,6 @@ export default function App() {
           </AnimatePresence>
         </section>
 
-        {/* ── How it works ───────────────────────────────────────────────────── */}
         <section id="how-it-works" className="max-w-7xl mx-auto px-6 mb-32 scroll-mt-24">
           <div className="text-center mb-16">
             <span className="text-[#6C63FF] font-black text-xs uppercase tracking-widest">Simple Process</span>
@@ -851,21 +837,9 @@ export default function App() {
           </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-10">
             {[
-              {
-                step: '01',
-                title: 'Upload your visualization',
-                desc: 'Drag and drop any dashboard screenshot, infographic export, or chart image. JPG, PNG, and WEBP all supported.',
-              },
-              {
-                step: '02',
-                title: 'AI analyzes color roles',
-                desc: 'Our AI identifies every intentional color, assigns it a semantic role (Background, Primary Data, Accent…), and explains the design intent.',
-              },
-              {
-                step: '03',
-                title: 'Export to your tool',
-                desc: 'Download Power BI JSON, Figma Tokens, CSS variables, or a shareable PNG palette — ready to use instantly.',
-              },
+              { step: '01', title: 'Upload your visualization', desc: 'Drag and drop any dashboard screenshot, infographic export, or chart image. JPG, PNG, and WEBP all supported.' },
+              { step: '02', title: 'AI analyzes color roles', desc: 'Our AI identifies every intentional color, assigns it a semantic role (Background, Primary Data, Accent…), and explains the design intent.' },
+              { step: '03', title: 'Export to your tool', desc: 'Download Power BI JSON, Figma Tokens, CSS variables, or a shareable PNG palette — ready to use instantly.' },
             ].map((item, i) => (
               <div key={i} className="bg-white rounded-3xl p-8 border border-gray-100 shadow-sm hover:shadow-md transition-shadow">
                 <div className="text-4xl font-black text-[#6C63FF]/20 mb-4">{item.step}</div>
@@ -876,7 +850,6 @@ export default function App() {
           </div>
         </section>
 
-        {/* ── Features ───────────────────────────────────────────────────────── */}
         <section id="features" className="max-w-7xl mx-auto px-6 mb-32 scroll-mt-24">
           <div className="text-center mb-16">
             <span className="text-[#6C63FF] font-black text-xs uppercase tracking-widest">Features</span>
@@ -884,26 +857,10 @@ export default function App() {
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {[
-              {
-                icon: <Zap className="w-6 h-6" />,
-                title: 'Semantic Role Extraction',
-                desc: "The AI doesn't just extract colors — it tells you which is the Background, which is Primary Data, which is an Alert Accent. Roles you can act on immediately.",
-              },
-              {
-                icon: <Shield className="w-6 h-6" />,
-                title: 'Colorblind Accessibility Check',
-                desc: 'Every palette is assessed for red-green and blue-yellow colorblindness. Toggle simulations on-screen and get plain-language advice.',
-              },
-              {
-                icon: <BarChart3 className="w-6 h-6" />,
-                title: 'Tool-Ready Export Formats',
-                desc: 'One click exports your palette to Power BI JSON, Figma Tokens, CSS custom properties, or a flat hex array for Excel and Tableau.',
-              },
-              {
-                icon: <MousePointer2 className="w-6 h-6" />,
-                title: 'Automatic Image Enhancement',
-                desc: 'Low-resolution screenshots are automatically upscaled before analysis, ensuring accurate hex extraction even from compressed exports.',
-              },
+              { icon: <Zap className="w-6 h-6" />, title: 'Semantic Role Extraction', desc: "The AI doesn't just extract colors — it tells you which is the Background, which is Primary Data, which is an Alert Accent. Roles you can act on immediately." },
+              { icon: <Shield className="w-6 h-6" />, title: 'Colorblind Accessibility Check', desc: 'Every palette is assessed for red-green and blue-yellow colorblindness. Toggle simulations on-screen and get plain-language advice.' },
+              { icon: <BarChart3 className="w-6 h-6" />, title: 'Tool-Ready Export Formats', desc: 'One click exports your palette to Power BI JSON, Figma Tokens, CSS custom properties, or a flat hex array for Excel and Tableau.' },
+              { icon: <MousePointer2 className="w-6 h-6" />, title: 'Automatic Image Enhancement', desc: 'Low-resolution screenshots are automatically upscaled before analysis, ensuring accurate hex extraction even from compressed exports.' },
             ].map((f, i) => (
               <div key={i} className="p-8 bg-white rounded-3xl border border-gray-100 shadow-sm hover:shadow-lg transition-all group">
                 <div className="w-12 h-12 bg-[#6C63FF]/8 rounded-2xl flex items-center justify-center text-[#6C63FF] mb-5 group-hover:bg-[#6C63FF]/15 transition-colors">
@@ -916,14 +873,12 @@ export default function App() {
           </div>
         </section>
 
-        {/* ── Pricing ────────────────────────────────────────────────────────── */}
         <section id="pricing" className="max-w-7xl mx-auto px-6 mb-32 scroll-mt-24">
           <div className="text-center mb-16">
             <span className="text-[#6C63FF] font-black text-xs uppercase tracking-widest">Pricing</span>
             <h2 className="text-4xl font-black mt-3 mb-4">Simple, transparent plans</h2>
           </div>
           <div className="grid md:grid-cols-2 gap-8 max-w-3xl mx-auto">
-            {/* Free */}
             <div className="p-8 bg-white rounded-3xl border border-gray-100 shadow-sm">
               <h3 className="text-lg font-black mb-1">Free</h3>
               <p className="text-gray-400 text-sm mb-6">For analysts and students getting started.</p>
@@ -943,7 +898,6 @@ export default function App() {
               </button>
             </div>
 
-            {/* Pro */}
             <div className="p-8 bg-[#6C63FF] rounded-3xl shadow-xl relative overflow-hidden">
               <span className="inline-block mb-4 px-3 py-1 bg-white/20 text-white text-[10px] font-black uppercase tracking-widest rounded-full">
                 Coming Soon
@@ -973,10 +927,8 @@ export default function App() {
 
       </main>
 
-      {/* ── Footer ───────────────────────────────────────────────────────────── */}
       <footer className="bg-[#0F1117] text-white">
         <div className="max-w-7xl mx-auto px-6 py-16 grid grid-cols-1 md:grid-cols-3 gap-12">
-          {/* Brand */}
           <div>
             <div className="flex items-center gap-2 mb-4">
               <div className="w-7 h-7 bg-[#6C63FF] rounded-lg flex items-center justify-center">
@@ -991,18 +943,12 @@ export default function App() {
               <span>Made with</span>
               <Heart className="w-3.5 h-3.5 text-red-400 fill-red-400" />
               <span>by</span>
-              <a
-                href="https://linktr.ee/AnalystFemi"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="font-bold text-[#6C63FF] hover:underline"
-              >
+              <a href="https://linktr.ee/AnalystFemi" target="_blank" rel="noopener noreferrer" className="font-bold text-[#6C63FF] hover:underline">
                 AnalystFemi
               </a>
             </div>
           </div>
 
-          {/* Quick links */}
           <div>
             <p className="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-5">Quick Links</p>
             <ul className="space-y-3">
@@ -1013,10 +959,7 @@ export default function App() {
                 { label: 'Try the tool', id: 'tool-dashboard' },
               ].map(({ label, id }) => (
                 <li key={id}>
-                  <button
-                    onClick={() => scrollTo(id)}
-                    className="text-gray-400 hover:text-white text-sm transition-colors"
-                  >
+                  <button onClick={() => scrollTo(id)} className="text-gray-400 hover:text-white text-sm transition-colors">
                     {label}
                   </button>
                 </li>
@@ -1024,39 +967,19 @@ export default function App() {
             </ul>
           </div>
 
-          {/* Social */}
           <div>
             <p className="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-5">Connect</p>
             <div className="flex items-center gap-4">
-              <a
-                href="https://linktr.ee/AnalystFemi"
-                target="_blank"
-                rel="noopener noreferrer"
-                title="Linktree"
-                className="w-9 h-9 rounded-xl bg-white/10 flex items-center justify-center text-gray-400 hover:text-white hover:bg-[#6C63FF] transition-all"
-              >
+              <a href="https://linktr.ee/AnalystFemi" target="_blank" rel="noopener noreferrer" className="w-9 h-9 rounded-xl bg-white/10 flex items-center justify-center text-gray-400 hover:text-white hover:bg-[#6C63FF] transition-all">
                 <Globe className="w-4 h-4" />
               </a>
-              <a
-                href="https://twitter.com/AnalystFemi"
-                target="_blank"
-                rel="noopener noreferrer"
-                title="Twitter / X"
-                className="w-9 h-9 rounded-xl bg-white/10 flex items-center justify-center text-gray-400 hover:text-white hover:bg-[#6C63FF] transition-all"
-              >
+              <a href="https://twitter.com/AnalystFemi" target="_blank" rel="noopener noreferrer" className="w-9 h-9 rounded-xl bg-white/10 flex items-center justify-center text-gray-400 hover:text-white hover:bg-[#6C63FF] transition-all">
                 <Twitter className="w-4 h-4" />
               </a>
-              <a
-                href="https://www.linkedin.com/in/analystfemi"
-                target="_blank"
-                rel="noopener noreferrer"
-                title="LinkedIn"
-                className="w-9 h-9 rounded-xl bg-white/10 flex items-center justify-center text-gray-400 hover:text-white hover:bg-[#6C63FF] transition-all"
-              >
+              <a href="https://www.linkedin.com/in/analystfemi" target="_blank" rel="noopener noreferrer" className="w-9 h-9 rounded-xl bg-white/10 flex items-center justify-center text-gray-400 hover:text-white hover:bg-[#6C63FF] transition-all">
                 <Linkedin className="w-4 h-4" />
               </a>
             </div>
-
             <div className="mt-8 p-4 bg-white/5 rounded-2xl border border-white/10">
               <p className="text-xs text-gray-400 leading-relaxed">
                 PaletteIQ is a free tool for the data visualization community. If it saves you time, share it with a colleague. 🎨
