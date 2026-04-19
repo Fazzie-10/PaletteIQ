@@ -61,6 +61,7 @@ export default function App() {
     });
   }, []);
 
+  // Countdown Timer when out of credits
   useEffect(() => {
     if (credits === 0) {
       const interval = setInterval(() => {
@@ -153,6 +154,7 @@ export default function App() {
   };
 
   const analyzePalette = async () => {
+    // STRICT FRONTEND CUTOFF
     if (!image || !session || credits === 0) return;
     
     setIsProcessing(true); setError(null); setExpandedSwatch(null);
@@ -177,7 +179,6 @@ export default function App() {
     }
   };
 
-  // FULLY RESTORED EXPORT LOGIC
   const exportPowerBI = () => {
     if (!result) return;
     const theme = {
@@ -454,7 +455,7 @@ export default function App() {
                       </button>
                     )}
                     
-                    {/* MOVED: Export Buttons in the Sidebar */}
+                    {/* Export Buttons in the Sidebar */}
                     {result && (
                       <div className="space-y-3">
                         <button onClick={exportPowerBI} className="w-full py-3 bg-yellow-50 text-yellow-600 border border-yellow-200 text-sm font-bold rounded-xl hover:bg-yellow-100 transition-all flex items-center justify-center gap-2"><Table className="w-4 h-4" /> Export Power BI</button>
@@ -498,7 +499,7 @@ export default function App() {
                        
                        <div className="text-center mb-8">
                         <h2 className="text-2xl md:text-3xl font-black tracking-tight mb-2">Extracted Palette</h2>
-                        {/* COLOR COUNT DISPLAY ADDED */}
+                        {/* COLOR COUNT DISPLAY */}
                         <p className="inline-flex items-center gap-1 px-3 py-1 bg-brand-primary/10 text-brand-primary rounded-full text-xs font-bold uppercase tracking-widest mt-2">
                           <Zap className="w-3 h-3" /> {result.palette.length} Colors Identified
                         </p>
