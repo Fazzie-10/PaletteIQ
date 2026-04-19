@@ -88,8 +88,10 @@ Return this exact structure:
   "colorblind_notes": "Plain language assessment. State whether the palette is safe for people with red-green color blindness or blue-yellow color blindness. Give one concrete suggestion if there is a problem."
 }`;
 
+    // FIX 1: Reverted to gemini-3.1-flash-lite-preview (500 RPD Quota)
+    // FIX 2: Used camelCase (inlineData and mimeType) for the Google REST payload
     const geminiRes = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-pro-preview:generateContent?key=${process.env.GEMINI_API_KEY}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite-preview:generateContent?key=${process.env.GEMINI_API_KEY}`,
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -98,7 +100,7 @@ Return this exact structure:
             {
               parts: [
                 { text: GEMINI_PROMPT },
-                { inline_data: { mime_type: "image/jpeg", data: imageBase64 } },
+                { inlineData: { mimeType: "image/jpeg", data: imageBase64 } },
               ],
             },
           ],
