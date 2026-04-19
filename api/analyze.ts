@@ -109,7 +109,7 @@ Return this exact structure:
 }`;
 
     const response = await ai.models.generateContent({
-      model: "gemini-2.5-flash", // Stable, reliable, supports JSON mode, vision-capable
+      model: "gemini-3.1-pro-preview", // Best vision + reasoning for dashboard color analysis
       contents: [
         {
           parts: [

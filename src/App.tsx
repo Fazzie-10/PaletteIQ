@@ -457,8 +457,8 @@ export default function App() {
             transition={{ delay: 0.05 }}
             className="text-5xl md:text-7xl font-black tracking-tight leading-[1.08] mb-6"
           >
-            Color Intelligence for<br />
-            <span className="text-[#6C63FF]">Every Dashboard.</span>
+            Universal Color Intelligence for <br />
+            <span className="text-[#6C63FF]">Every Data Visualization</span>
           </motion.h1>
 
           <motion.p
@@ -944,10 +944,10 @@ export default function App() {
             </div>
 
             {/* Pro */}
-            <div className="p-8 bg-[#6C63FF] rounded-3xl border border-[#6C63FF] shadow-xl relative overflow-hidden">
-              <div className="absolute top-0 right-8 -translate-y-1/2 px-3 py-1 bg-white text-[#6C63FF] text-[10px] font-black uppercase tracking-widest rounded-full shadow">
+            <div className="p-8 bg-[#6C63FF] rounded-3xl shadow-xl relative overflow-hidden">
+              <span className="inline-block mb-4 px-3 py-1 bg-white/20 text-white text-[10px] font-black uppercase tracking-widest rounded-full">
                 Coming Soon
-              </div>
+              </span>
               <h3 className="text-lg font-black text-white mb-1">Pro Analyst</h3>
               <p className="text-indigo-200 text-sm mb-6">For professionals building daily dashboards.</p>
               <div className="flex items-baseline gap-2 mb-6">
@@ -955,18 +955,18 @@ export default function App() {
                 <div className="text-sm text-indigo-300">or $29.99/yr</div>
               </div>
               <ul className="space-y-3 mb-8">
-                {['Unlimited daily extractions', 'Priority API processing', 'Saved palette history', 'Team sharing (coming soon)'].map((item) => (
+                {['Unlimited daily extractions', 'Priority API processing', 'Saved palette history', 'Team sharing'].map((item) => (
                   <li key={item} className="flex items-center gap-3 text-sm text-indigo-100">
                     <Check className="w-4 h-4 text-white shrink-0" /> {item}
                   </li>
                 ))}
               </ul>
-              <button
-                disabled
-                className="w-full py-3.5 bg-white/20 text-white font-bold rounded-xl cursor-not-allowed"
+              <a
+                href="mailto:analystfemi@gmail.com?subject=PaletteIQ Pro - Notify Me&body=Hi, I'd like to be notified when PaletteIQ Pro launches."
+                className="block w-full py-3.5 bg-white text-[#6C63FF] font-bold rounded-xl text-center hover:bg-indigo-50 transition-all"
               >
-                Notify Me
-              </button>
+                Notify Me When Live
+              </a>
             </div>
           </div>
         </section>
@@ -1027,30 +1027,33 @@ export default function App() {
           {/* Social */}
           <div>
             <p className="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-5">Connect</p>
-            <div className="space-y-3">
+            <div className="flex items-center gap-4">
               <a
                 href="https://linktr.ee/AnalystFemi"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex items-center gap-3 text-gray-400 hover:text-white text-sm transition-colors"
+                title="Linktree"
+                className="w-9 h-9 rounded-xl bg-white/10 flex items-center justify-center text-gray-400 hover:text-white hover:bg-[#6C63FF] transition-all"
               >
-                <Globe className="w-4 h-4" /> linktr.ee/AnalystFemi
+                <Globe className="w-4 h-4" />
               </a>
               <a
                 href="https://twitter.com/AnalystFemi"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex items-center gap-3 text-gray-400 hover:text-white text-sm transition-colors"
+                title="Twitter / X"
+                className="w-9 h-9 rounded-xl bg-white/10 flex items-center justify-center text-gray-400 hover:text-white hover:bg-[#6C63FF] transition-all"
               >
-                <Twitter className="w-4 h-4" /> @AnalystFemi
+                <Twitter className="w-4 h-4" />
               </a>
               <a
                 href="https://www.linkedin.com/in/analystfemi"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex items-center gap-3 text-gray-400 hover:text-white text-sm transition-colors"
+                title="LinkedIn"
+                className="w-9 h-9 rounded-xl bg-white/10 flex items-center justify-center text-gray-400 hover:text-white hover:bg-[#6C63FF] transition-all"
               >
-                <Linkedin className="w-4 h-4" /> LinkedIn
+                <Linkedin className="w-4 h-4" />
               </a>
             </div>
 
