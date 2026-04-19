@@ -1,3 +1,4 @@
+import { GoogleGenAI } from "@google/genai";
 import { createClient } from "@supabase/supabase-js";
 
 export default async function handler(req: any, res: any) {
@@ -12,14 +13,16 @@ export default async function handler(req: any, res: any) {
       return res.status(400).json({ error: "No image data provided." });
     }
 
+    // --- Auth ---
     const authHeader = req.headers.authorization;
     if (!authHeader) {
       return res.status(401).json({ error: "Please log in to use this tool." });
     }
 
+    // Using VITE_ prefixes to ensure it matches the environment variables we set up earlier
     const supabase = createClient(
-      process.env.SUPABASE_URL!,
-      process.env.SUPABASE_ANON_KEY!,
+      process.env.VITE_SUPABASE_URL!,
+      process.env.VITE_SUPABASE_ANON_KEY!,
       { global: { headers: { Authorization: authHeader } } }
     );
 
@@ -28,6 +31,7 @@ export default async function handler(req: any, res: any) {
       return res.status(401).json({ error: "Session expired. Please log in again." });
     }
 
+    // --- Credit Logic ---
     const { data: profile, error: profileError } = await supabase
       .from("profiles")
       .select("credits, last_reset_date")
@@ -35,6 +39,7 @@ export default async function handler(req: any, res: any) {
       .single();
 
     if (profileError || !profile) {
+      console.error("Profile fetch error:", profileError);
       return res.status(500).json({ error: "Could not load your profile. Please try logging out and back in." });
     }
 
@@ -55,7 +60,7 @@ export default async function handler(req: any, res: any) {
       });
     }
 
-    // THE FIX: Ultra-strict, exhaustive eyedropper prompt
+    // --- Gemini API Call (Official SDK) ---
     const GEMINI_PROMPT = `You are an expert color extraction algorithm and data visualization analyst.
 Your task is to analyze the provided image and extract the EXACT hex codes for every meaningful color present. 
 
@@ -79,37 +84,32 @@ Return ONLY valid JSON.
   "colorblind_notes": "Plain language accessibility assessment."
 }`;
 
-    const geminiRes = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite-preview:generateContent?key=${process.env.GEMINI_API_KEY}`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          contents: [
-            {
-              parts: [
-                { text: GEMINI_PROMPT },
-                { inlineData: { mimeType: "image/jpeg", data: imageBase64 } },
-              ],
-            },
-          ],
-          generationConfig: { responseMimeType: "application/json" },
-        }),
+    // Initialize the official SDK
+    const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! });
+    
+    const response = await ai.models.generateContent({
+      model: "gemini-3.1-flash-lite-preview",
+      contents: [{
+        role: "user",
+        parts: [
+          { text: GEMINI_PROMPT },
+          { inlineData: { data: imageBase64, mimeType: "image/jpeg" } }
+        ]
+      }],
+      config: { 
+        responseMimeType: "application/json" 
       }
-    );
+    });
 
-    if (!geminiRes.ok) {
-      return res.status(502).json({ error: "AI service error. Please try again in a moment." });
-    }
+    const rawText = response.text || "";
 
-    const geminiData = await geminiRes.json();
-    const rawText = geminiData?.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
-
+    // Parse and validate
     let result;
     try {
       const clean = rawText.replace(/```json|```/g, "").trim();
       result = JSON.parse(clean);
     } catch (parseError) {
+      console.error("JSON parse error:", parseError, "Raw text:", rawText);
       return res.status(500).json({
         error: "AI returned an unexpected format. Please try again with a clearer image.",
       });
@@ -121,17 +121,25 @@ Return ONLY valid JSON.
       });
     }
 
-    await supabase
+    // --- Deduct credit ONLY after successful analysis ---
+    const { error: deductError } = await supabase
       .from("profiles")
       .update({ credits: currentCredits - 1 })
       .eq("id", user.id);
 
+    if (deductError) {
+      console.error("Credit deduction error:", deductError);
+    }
+
     return res.status(200).json(result);
 
   } catch (error: any) {
+    console.error("Unhandled API error:", error.message, error);
+
     if (error.message?.includes("quota") || error.message?.includes("429")) {
       return res.status(429).json({ error: "AI service is busy right now. Please try again in a moment." });
     }
+
     return res.status(500).json({ error: "Analysis failed. Please try a clearer image or a different file." });
   }
 }
