@@ -230,18 +230,14 @@ export default function App() {
     const padding = 60;
     const columns = 4;
     const rows = Math.ceil(result.palette.length / columns);
-    
-    // Increased row height to give text room to breathe
-    const rowHeight = swatchSize + 320; 
+    const rowHeight = swatchSize + 180;
     
     canvas.width = columns * (swatchSize + padding * 2) + padding;
     canvas.height = rows * rowHeight + padding + 150;
 
-    // Background
     ctx.fillStyle = '#FFFFFF';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-    // Title
     ctx.fillStyle = '#0F1117';
     ctx.font = 'bold 42px sans-serif';
     ctx.textAlign = 'center';
@@ -253,68 +249,46 @@ export default function App() {
       const x = padding + col * (swatchSize + padding * 2) + (swatchSize + padding * 2) / 2;
       const y = padding + 150 + row * rowHeight + swatchSize / 2;
 
-      // Draw Color Circle
       ctx.beginPath();
       ctx.arc(x, y, swatchSize / 2, 0, Math.PI * 2);
       ctx.fillStyle = color.hex;
       ctx.fill();
 
-      // Draw Border for light colors
       if (isLightColor(color.hex)) {
         ctx.strokeStyle = '#E5E7EB';
         ctx.lineWidth = 2;
         ctx.stroke();
       }
 
-      // Draw Hex Code
       ctx.fillStyle = '#111827';
       ctx.font = 'bold 20px sans-serif';
       ctx.fillText(color.hex.toUpperCase(), x, y + swatchSize / 2 + 35);
       
-      // Draw Role Badge
       ctx.fillStyle = '#4F46E5';
-      ctx.font = 'bold 12px sans-serif';
+      ctx.font = 'bold 14px sans-serif';
       ctx.fillText(color.role.toUpperCase(), x, y + swatchSize / 2 + 60);
 
-      // Draw Paragraph Text with Smart Wrapping & Truncation
       ctx.fillStyle = '#6B7280';
-      ctx.font = '13px sans-serif'; // Slightly larger for readability
-      
+      ctx.font = '12px sans-serif';
       const words = color.reasoning.split(' ');
       let line = '';
       let lineCount = 0;
+      const maxWidth = swatchSize + 40;
       
-      // Widened the text block slightly
-      const maxWidth = swatchSize + 80; 
-      const lineHeight = 20;
-
       for (let n = 0; n < words.length; n++) {
         const testLine = line + words[n] + ' ';
         const metrics = ctx.measureText(testLine);
-        
         if (metrics.width > maxWidth && n > 0) {
-          // Safety Truncation - Stop drawing if it hits 8 lines
-          if (lineCount < 7) {
-            ctx.fillText(line, x, y + swatchSize / 2 + 95 + (lineCount * lineHeight));
-            line = words[n] + ' ';
-            lineCount++;
-          } else if (lineCount === 7) {
-            ctx.fillText(line + '...', x, y + swatchSize / 2 + 95 + (lineCount * lineHeight));
-            lineCount++;
-            break; // Stop the loop completely
-          }
+          ctx.fillText(line, x, y + swatchSize / 2 + 85 + (lineCount * 18));
+          line = words[n] + ' ';
+          lineCount++;
         } else {
           line = testLine;
         }
       }
-      
-      // Print the final line if we didn't hit the truncation limit
-      if (lineCount <= 7) {
-        ctx.fillText(line, x, y + swatchSize / 2 + 95 + (lineCount * lineHeight));
-      }
+      ctx.fillText(line, x, y + swatchSize / 2 + 85 + (lineCount * 18));
     });
 
-    // Trigger Download
     const url = canvas.toDataURL('image/png');
     const a = document.createElement('a');
     a.href = url;
@@ -671,9 +645,11 @@ export default function App() {
         </section>
       </main>
 
+      {/* UPDATED FOOTER */}
       <footer className="bg-[#0F1117] text-white py-16 border-t border-gray-800">
         <div className="max-w-7xl mx-auto px-6 grid grid-cols-1 md:grid-cols-12 gap-12">
           
+          {/* Left Column: Brand & Description */}
           <div className="col-span-1 md:col-span-5">
             <div className="flex items-center gap-2 mb-6">
               <Palette className="text-brand-primary w-6 h-6" />
@@ -687,6 +663,7 @@ export default function App() {
             </div>
           </div>
 
+          {/* Middle Column: Quick Links */}
           <div className="col-span-1 md:col-span-3">
             <h4 className="text-xs font-bold text-gray-500 uppercase tracking-widest mb-6">Quick Links</h4>
             <ul className="space-y-4 text-gray-400 text-sm">
@@ -697,6 +674,7 @@ export default function App() {
             </ul>
           </div>
 
+          {/* Right Column: Connect & Socials */}
           <div className="col-span-1 md:col-span-4">
             <h4 className="text-xs font-bold text-gray-500 uppercase tracking-widest mb-6">Connect</h4>
             
@@ -733,6 +711,7 @@ export default function App() {
           </div>
         </div>
 
+        {/* Bottom Bar */}
         <div className="max-w-7xl mx-auto px-6 mt-16 pt-8 border-t border-gray-800 flex flex-col md:flex-row justify-between items-center gap-4 text-xs text-gray-500">
           <p>© 2026 PaletteIQ. Built by AnalystFemi. All rights reserved.</p>
           <div className="flex gap-6">
