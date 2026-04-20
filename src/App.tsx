@@ -2,7 +2,8 @@ import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { supabase } from './supabase';
 import { 
   Upload, Copy, Check, Zap, Palette, Table, Layers, AlertCircle, X,
-  ChevronRight, Twitter, Facebook, Instagram, Music2, Shield, BarChart3, LogIn, MousePointer2, Clock
+  ChevronRight, Twitter, Facebook, Instagram, Music2, Shield, BarChart3, LogIn, MousePointer2, Clock,
+  Linkedin, Github, Youtube, Mail
 } from 'lucide-react';
 import { motion } from 'motion/react';
 
@@ -61,7 +62,7 @@ export default function App() {
     });
   }, []);
 
-  // FIX 1: Enhanced Timer & Automatic Next-Day Unlock
+  // Countdown Timer when out of credits
   useEffect(() => {
     if (credits === 0 && session) {
       const interval = setInterval(() => {
@@ -86,11 +87,9 @@ export default function App() {
   }, [credits, session]);
 
   const fetchCredits = async (userId: string) => {
-    // We now fetch last_reset_date so the frontend knows if a new day has started
     const { data } = await supabase.from('profiles').select('credits, last_reset_date').eq('id', userId).single();
     if (data) {
       const today = new Date().toISOString().split('T')[0];
-      // If the user's last reset was yesterday or older, optimistically unlock the UI to 5 credits
       if (!data.last_reset_date || data.last_reset_date < today) {
         setCredits(5);
       } else {
@@ -533,7 +532,6 @@ export default function App() {
                               </div>
                             </div>
                             
-                            {/* FIX 2: Restored onClick handler for Mobile text expansion */}
                             <div 
                               className="mt-3 text-center w-full md:cursor-default cursor-pointer" 
                               onClick={() => setExpandedSwatch(expandedSwatch === idx ? null : idx)}
@@ -541,7 +539,6 @@ export default function App() {
                               <p className="text-xs font-black tracking-tight text-text-main uppercase">{color.hex}</p>
                               <p className="text-[9px] font-bold text-brand-primary uppercase tracking-widest mt-0.5">{color.role}</p>
                               
-                              {/* FIX 2: Dynamic line-clamp based on expandedSwatch state */}
                               <p className={`text-[9px] text-text-muted leading-tight mt-1.5 px-1 transition-all ${expandedSwatch === idx ? 'line-clamp-none' : 'line-clamp-2 md:group-hover:line-clamp-none'}`}>
                                 {color.reasoning}
                               </p>
@@ -648,19 +645,82 @@ export default function App() {
         </section>
       </main>
 
-      <footer className="bg-[#0F1117] text-white py-20">
-         <div className="max-w-7xl mx-auto px-6 grid grid-cols-1 md:grid-cols-4 gap-12">
-          <div className="col-span-1 md:col-span-2">
+      {/* UPDATED FOOTER */}
+      <footer className="bg-[#0F1117] text-white py-16 border-t border-gray-800">
+        <div className="max-w-7xl mx-auto px-6 grid grid-cols-1 md:grid-cols-12 gap-12">
+          
+          {/* Left Column: Brand & Description */}
+          <div className="col-span-1 md:col-span-5">
             <div className="flex items-center gap-2 mb-6">
               <Palette className="text-brand-primary w-6 h-6" />
               <span className="text-xl font-bold">PaletteIQ</span>
             </div>
-            <p className="text-gray-400 max-w-sm mb-8">
-              The ultimate color intelligence tool for data professionals. Extract, analyze, and export professional palettes in seconds.
+            <p className="text-gray-400 text-sm leading-relaxed mb-8 max-w-sm">
+              The ultimate color intelligence tool for data professionals. Extract, analyze, and export professional palettes from any dashboard in seconds.
             </p>
+            <div className="text-gray-400 text-sm">
+              Made with <span className="text-red-500">❤️</span> by <a href="https://linktr.ee/AnalystFemi" target="_blank" rel="noopener noreferrer" className="text-brand-primary font-bold hover:underline">AnalystFemi</a>
+            </div>
+          </div>
+
+          {/* Middle Column: Quick Links */}
+          <div className="col-span-1 md:col-span-3">
+            <h4 className="text-xs font-bold text-gray-500 uppercase tracking-widest mb-6">Quick Links</h4>
+            <ul className="space-y-4 text-gray-400 text-sm">
+              <li><a href="#how-to-use" className="hover:text-white transition-colors">How it works</a></li>
+              <li><a href="#features" className="hover:text-white transition-colors">Features</a></li>
+              <li><a href="#pricing" className="hover:text-white transition-colors">Pricing</a></li>
+              <li><button onClick={() => document.getElementById('tool-dashboard')?.scrollIntoView({ behavior: 'smooth' })} className="hover:text-white transition-colors">Try the tool</button></li>
+            </ul>
+          </div>
+
+          {/* Right Column: Connect & Socials */}
+          <div className="col-span-1 md:col-span-4">
+            <h4 className="text-xs font-bold text-gray-500 uppercase tracking-widest mb-6">Connect</h4>
+            
+            <div className="flex flex-wrap gap-3 mb-8">
+              <a href="https://www.linkedin.com/in/joshua-akintayo/" target="_blank" rel="noopener noreferrer" className="w-10 h-10 bg-gray-800 rounded-full flex items-center justify-center hover:bg-brand-primary transition-colors cursor-pointer text-gray-400 hover:text-white" aria-label="LinkedIn">
+                <Linkedin className="w-4 h-4" />
+              </a>
+              <a href="https://x.com/_joshuafemi?s=21" target="_blank" rel="noopener noreferrer" className="w-10 h-10 bg-gray-800 rounded-full flex items-center justify-center hover:bg-brand-primary transition-colors cursor-pointer text-gray-400 hover:text-white" aria-label="X (Twitter)">
+                <Twitter className="w-4 h-4" />
+              </a>
+              <a href="https://github.com/Pajo00" target="_blank" rel="noopener noreferrer" className="w-10 h-10 bg-gray-800 rounded-full flex items-center justify-center hover:bg-brand-primary transition-colors cursor-pointer text-gray-400 hover:text-white" aria-label="GitHub">
+                <Github className="w-4 h-4" />
+              </a>
+              <a href="mailto:Joshuaakintayo21@gmail.com" className="w-10 h-10 bg-gray-800 rounded-full flex items-center justify-center hover:bg-brand-primary transition-colors cursor-pointer text-gray-400 hover:text-white" aria-label="Email">
+                <Mail className="w-4 h-4" />
+              </a>
+              <a href="https://www.tiktok.com/@analystfemi" target="_blank" rel="noopener noreferrer" className="w-10 h-10 bg-gray-800 rounded-full flex items-center justify-center hover:bg-brand-primary transition-colors cursor-pointer text-gray-400 hover:text-white" aria-label="TikTok">
+                <Music2 className="w-4 h-4" />
+              </a>
+              <a href="https://www.youtube.com/@AnalystFemi" target="_blank" rel="noopener noreferrer" className="w-10 h-10 bg-gray-800 rounded-full flex items-center justify-center hover:bg-brand-primary transition-colors cursor-pointer text-gray-400 hover:text-white" aria-label="YouTube">
+                <Youtube className="w-4 h-4" />
+              </a>
+              <a href="https://www.instagram.com/_joshua.femi/" target="_blank" rel="noopener noreferrer" className="w-10 h-10 bg-gray-800 rounded-full flex items-center justify-center hover:bg-brand-primary transition-colors cursor-pointer text-gray-400 hover:text-white" aria-label="Instagram">
+                <Instagram className="w-4 h-4" />
+              </a>
+              <a href="https://web.facebook.com/profile.php?id=100087293221410" target="_blank" rel="noopener noreferrer" className="w-10 h-10 bg-gray-800 rounded-full flex items-center justify-center hover:bg-brand-primary transition-colors cursor-pointer text-gray-400 hover:text-white" aria-label="Facebook">
+                <Facebook className="w-4 h-4" />
+              </a>
+            </div>
+            
+            <div className="p-4 bg-gray-800/50 rounded-xl border border-gray-700/50 text-sm text-gray-400 leading-relaxed">
+              PaletteIQ is a free tool for the data visualization community. If it saves you time, share it with a colleague. 🎨
+            </div>
+          </div>
+        </div>
+
+        {/* Bottom Bar */}
+        <div className="max-w-7xl mx-auto px-6 mt-16 pt-8 border-t border-gray-800 flex flex-col md:flex-row justify-between items-center gap-4 text-xs text-gray-500">
+          <p>© 2026 PaletteIQ. Built by AnalystFemi. All rights reserved.</p>
+          <div className="flex gap-6">
+            <button onClick={() => setShowPrivacy(true)} className="hover:text-white transition-colors">Privacy Policy</button>
+            <button onClick={() => setShowTerms(true)} className="hover:text-white transition-colors">Terms of Service</button>
           </div>
         </div>
       </footer>
+
     </div>
   );
 }
